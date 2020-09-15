@@ -3,6 +3,7 @@ import re
 from bs4 import BeautifulSoup as bs
 from urllib.parse import urljoin
 import pymysql.cursors
+from credentials import Credentials as cred
 
 # Data Models
 class Author:
@@ -18,7 +19,7 @@ class Data:
                 self.tags=tags
 
 #connect to db
-connection = pymysql.connect(host='localhost',user='root',password='root',db='webscrape',charset='utf8mb4',cursorclass=pymysql.cursors.DictCursor)
+connection = pymysql.connect(host='localhost',user=cred.username,password=cred.password,db=cred.db_name,charset='utf8mb4',cursorclass=pymysql.cursors.DictCursor)
 
 
 def add_data(data):
@@ -50,36 +51,41 @@ def add_data(data):
         except pymysql.Error as e:
                 print(e)
         
-# get the web page
-r = requests.get("http://toscrape.com")
-#use beautiful soup to structure the html
-soup = bs(r.content, 'html.parser')
-#find the link to quotes
-url_to_quotes=soup.find("a",text=re.compile("A website"))['href']
-# get the web page
-r = requests.get(url_to_quotes)
-#use beautiful soup to structure the html
-soup = bs(r.content, 'html.parser')
-# pretify the output
-soup.pretify
-stop=False
-page=1;
-while stop == False:
-        print('Scaraping Page %i' %page)
-        #get quote details
-        for quote_div in soup.find_all("div", {"class":"quote"}):
-            quote = quote_div.find("span", {"class":"text"}).text
-            author_name = quote_div.find("small",{"class":"author"}).text
-            tags = [tag.text for tag in quote_div.find_all("a",{"class":"tag"})]
-            # Get the author details
-            asoup = bs(requests.get(urljoin(url_to_quotes,quote_div.find("a")['href'])).content, 'html.parser')
-            author_dob=asoup.find("span",{"class":"author-born-date"}).text
-            author_description = asoup.find("div",{"class":"author-description"}).text.strip()
-            add_data(Data(Author(author_name,author_dob,author_description),quote,tags))
-        if soup.find('li','next') ==None:   # Check if next page does'nt exists
-                stop=True
-        else:   # If next page exists, Goto next page
-                next_page=soup.find('li','next').find('a')['href']
-                soup = bs(requests.get(urljoin(url_to_quotes,next_page)).content, 'html.parser')
-                page+=1
-connection.close()
+
+def main():
+        # get the web page
+        r = requests.get("http://toscrape.com")
+        #use beautiful soup to structure the html
+        soup = bs(r.content, 'html.parser')
+        #find the link to quotes
+        url_to_quotes=soup.find("a",text=re.compile("A website"))['href']
+        # get the web page
+        r = requests.get(url_to_quotes)
+        #use beautiful soup to structure the html
+        soup = bs(r.content, 'html.parser')
+        # pretify the output
+        soup.pretify
+        stop=False
+        page=1
+        while stop == False:
+                print('Scaraping Page %i' %page)
+                #get quote details
+                for quote_div in soup.find_all("div", {"class":"quote"}):
+                        quote = quote_div.find("span", {"class":"text"}).text
+                        author_name = quote_div.find("small",{"class":"author"}).text
+                        tags = [tag.text for tag in quote_div.find_all("a",{"class":"tag"})]
+                        # Get the author details
+                        asoup = bs(requests.get(urljoin(url_to_quotes,quote_div.find("a")['href'])).content, 'html.parser')
+                        author_dob=asoup.find("span",{"class":"author-born-date"}).text
+                        author_description = asoup.find("div",{"class":"author-description"}).text.strip()
+                        add_data(Data(Author(author_name,author_dob,author_description),quote,tags))
+                if soup.find('li','next') ==None:   # Check if next page does'nt exists
+                        stop=True
+                else:   # If next page exists, Goto next page
+                        next_page=soup.find('li','next').find('a')['href']
+                        soup = bs(requests.get(urljoin(url_to_quotes,next_page)).content, 'html.parser')
+                        page+=1
+        connection.close()
+
+if __name__ == '__main__':
+        main()
