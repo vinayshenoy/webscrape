@@ -1,4 +1,5 @@
-import requests
+#import requests
+import urllib.request as urllib2
 import re
 from bs4 import BeautifulSoup as bs
 from urllib.parse import urljoin
@@ -54,15 +55,16 @@ def add_data(data):
 
 def main():
         # get the web page
-        r = requests.get("http://toscrape.com")
+        # r = requests.get("http://toscrape.com")
+        req = urllib2.urlopen("http://toscrape.com").read()
         #use beautiful soup to structure the html
-        soup = bs(r.content, 'html.parser')
+        soup = bs(req, 'html.parser')
         #find the link to quotes
         url_to_quotes=soup.find("a",text=re.compile("A website"))['href']
         # get the web page
-        r = requests.get(url_to_quotes)
+        req = urllib2.urlopen(url_to_quotes).read
         #use beautiful soup to structure the html
-        soup = bs(r.content, 'html.parser')
+        soup = bs(req, 'html.parser')
         # pretify the output
         soup.pretify
         stop=False
@@ -75,7 +77,7 @@ def main():
                         author_name = quote_div.find("small",{"class":"author"}).text
                         tags = [tag.text for tag in quote_div.find_all("a",{"class":"tag"})]
                         # Get the author details
-                        asoup = bs(requests.get(urljoin(url_to_quotes,quote_div.find("a")['href'])).content, 'html.parser')
+                        asoup = bs(urllib2.urlopen(urljoin(url_to_quotes,quote_div.find("a")['href'])).read(), 'html.parser')
                         author_dob=asoup.find("span",{"class":"author-born-date"}).text
                         author_description = asoup.find("div",{"class":"author-description"}).text.strip()
                         add_data(Data(Author(author_name,author_dob,author_description),quote,tags))
@@ -83,7 +85,7 @@ def main():
                         stop=True
                 else:   # If next page exists, Goto next page
                         next_page=soup.find('li','next').find('a')['href']
-                        soup = bs(requests.get(urljoin(url_to_quotes,next_page)).content, 'html.parser')
+                        soup = bs(urllib2.urlopen(urljoin(url_to_quotes,next_page)).read(), 'html.parser')
                         page+=1
         connection.close()
 
