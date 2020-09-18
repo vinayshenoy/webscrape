@@ -1,10 +1,11 @@
-#import requests
-import urllib.request as urllib2
+# import requests
 import re
 from bs4 import BeautifulSoup as bs
 from urllib.parse import urljoin
+import urllib.request as urllib2
 import pymysql.cursors
-from credentials import Credentials as cred
+from credential import Credential
+from connection import Connection
 
 # Data Models
 
@@ -23,82 +24,84 @@ class Data:
         self.tags = tags
 
 
-# connect to db
-connection = pymysql.connect(host='localhost', user=cred.username, password=cred.password,
-                             db=cred.db_name, charset='utf8mb4', cursorclass=pymysql.cursors.DictCursor)
-
-
-def add_data(data):
+def add_data(connection, data):
     try:
-        with connection.cursor() as cursor:
-            sql = "SELECT `id` FROM `author` WHERE `name`=%s"
-            cursor.execute(sql, (data.author.name))
-            result = cursor.fetchone()
-            id = -1
-            qid = -1
-            if result == None:
-                with connection.cursor() as c:
-                    sql = "INSERT INTO `author` (`name`, `dob`, `description`) VALUES (%s, %s, %s)"
-                    c.execute(sql, (data.author.name,
-                                    data.author.dob, data.author.description))
-                    id = c.lastrowid
-                connection.commit()
-            else:
-                id = result['id']
-            with connection.cursor() as c:
-                sql = "INSERT INTO `quotes` (`author_id`, `quote`) VALUES (%s, %s)"
-                c.execute(sql, (id, data.quote))
-                qid = c.lastrowid
-            connection.commit()
-            with connection.cursor() as c:
-                sql = "INSERT INTO `tags` (`quote_id`, `tag`) VALUES (%s, %s)"
-                for tag in data.tags:
-                    c.execute(sql, (qid, tag))
-            connection.commit()
-    except pymysql.Error as e:
-        print(e)
+        result = Connection.get_single_data(connection, ['id'], ['author'], [
+                                            'name'], [data.author.name])
+        id = -1
+        qid = -1
+        if result == None:
+            id = Connection.insert_data(connection, ['name', 'dob', 'description'], 'author', [
+                                        data.author.name, data.author.dob, data.author.description])
+        else:
+            id = result['id']
+        qid = Connection.insert_data(
+            connection, ['author_id', 'quote'], 'quotes', [id, data.quote])
+        qid = Connection.insert_data(connection, ['quote_id', 'tag'], 'tags', [
+                                     qid, ",".join(data.tags)])
+    except pymysql.Error as err:
+        print(err)
 
 
 def main():
-    # get the web page
-    # r = requests.get("http://toscrape.com")
-    req = urllib2.urlopen("http://toscrape.com").read()
-    # use beautiful soup to structure the html
-    soup = bs(req, 'html.parser')
+    try:
+        myCredential = Credential()
+        connection_obj = Connection(myCredential)
+        connection = connection_obj.connect_db("localhost", "webscrape")
+    except pymysql.Error as err:
+        print(err)
+
+    # get access to the web page using urllib2
+    html_code = urllib2.urlopen("http://toscrape.com").read()
+    parsed_html_code = bs(html_code, 'html.parser')
+
     # find the link to quotes
-    url_to_quotes = soup.find("a", text=re.compile("A website"))['href']
+    url_to_quotes = parsed_html_code.find(
+        "a", text=re.compile("A website"))['href']
+
     # get the web page
-    req = urllib2.urlopen(url_to_quotes).read
-    # use beautiful soup to structure the html
-    soup = bs(req, 'html.parser')
-    # pretify the output
-    soup.pretify
+    html_code = urllib2.urlopen(url_to_quotes).read()
+    parsed_html_code = bs(html_code, 'html.parser')
+
+    # Scrapping All Pages
     stop = False
     page = 1
     while stop == False:
         print('Scaraping Page %i' % page)
         # get quote details
-        for quote_div in soup.find_all("div", {"class": "quote"}):
+        for quote_div in parsed_html_code.find_all("div", {"class": "quote"}):
             quote = quote_div.find("span", {"class": "text"}).text
             author_name = quote_div.find("small", {"class": "author"}).text
             tags = [tag.text for tag in quote_div.find_all(
                 "a", {"class": "tag"})]
+
             # Get the author details
-            asoup = bs(urllib2.urlopen(
+            author_parsed_html_code = bs(urllib2.urlopen(
                 urljoin(url_to_quotes, quote_div.find("a")['href'])).read(), 'html.parser')
-            author_dob = asoup.find("span", {"class": "author-born-date"}).text
-            author_description = asoup.find(
+            author_dob = author_parsed_html_code.find(
+                "span", {"class": "author-born-date"}).text
+            author_description = author_parsed_html_code.find(
                 "div", {"class": "author-description"}).text.strip()
-            add_data(Data(Author(author_name, author_dob,
-                                 author_description), quote, tags))
-        if soup.find('li', 'next') == None:   # Check if next page does'nt exists
+
+            author_obj = Author(author_name, author_dob, author_description)
+            data_obj = Data(author_obj, quote, tags)
+            add_data(connection, data_obj)
+
+        # Check if next page does'nt exists
+        if parsed_html_code.find('li', 'next') == None:
             stop = True
         else:   # If next page exists, Goto next page
-            next_page = soup.find('li', 'next').find('a')['href']
-            soup = bs(urllib2.urlopen(
+            next_page = parsed_html_code.find('li', 'next').find('a')['href']
+            parsed_html_code = bs(urllib2.urlopen(
                 urljoin(url_to_quotes, next_page)).read(), 'html.parser')
             page += 1
+
+    print("For test purpose: id-1")
+    result = Connection.get_single_data(connection, ['id'], ['author'], [
+                                        'name'], ['Albert Einstein'])
+    print(result)
     connection.close()
+    print("Task Done!!!")
 
 
 if __name__ == '__main__':
