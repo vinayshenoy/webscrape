@@ -1,8 +1,8 @@
 class Credential:
     def __init__(self):
         self.username = "root"
-        self.password = ""  
-    
+        self.password = ""
+
     @staticmethod
     def get_username(cred):
         return cred.username
