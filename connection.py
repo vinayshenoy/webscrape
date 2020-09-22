@@ -2,12 +2,12 @@ import pymysql.cursors
 from credential import Credential
 
 
-class Connection:
-    def __init__(self, cred):
-        self.myCred = cred
+class Connection(Credential):
+    def __init__(self):
+        Credential.__init__(self)
 
-    def connect_db(self, host, dbName):
-        connection = pymysql.connect(host=host, user=Credential.get_username(self.myCred), password=Credential.get_password(self.myCred),
+    def start(self, host, dbName):
+        connection = pymysql.connect(host=host, user=self.get_username(self), password=self.get_password(self),
                                      db=dbName, charset='utf8mb4', cursorclass=pymysql.cursors.DictCursor)
         return connection
 
