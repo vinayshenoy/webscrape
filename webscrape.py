@@ -4,7 +4,6 @@ from bs4 import BeautifulSoup as bs
 from urllib.parse import urljoin
 import urllib.request as urllib2
 import pymysql.cursors
-from credential import Credential
 from connection import Connection
 
 # Data Models
@@ -45,9 +44,8 @@ def add_data(connection, data):
 
 def main():
     try:
-        myCredential = Credential()
-        connection_obj = Connection(myCredential)
-        connection = connection_obj.connect_db("localhost", "webscrape")
+        connection_obj = Connection()
+        connection = connection_obj.start("localhost", "webscrape")
     except pymysql.Error as err:
         print(err)
 
@@ -96,10 +94,10 @@ def main():
                 urljoin(url_to_quotes, next_page)).read(), 'html.parser')
             page += 1
 
-    print("For test purpose: id-1")
-    result = Connection.get_single_data(connection, ['id'], ['author'], [
-                                        'name'], ['Albert Einstein'])
-    print(result)
+    # print("For test purpose: id-1")
+    # result = Connection.get_single_data(connection, ['*'], ['author'], [
+    #                                     'name'], ['Albert Einstein'])
+    # print(result)
     connection.close()
     print("Task Done!!!")
 
